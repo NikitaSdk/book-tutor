@@ -1,0 +1,1454 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Book Tutor</title>
+<link rel="icon" href="data:,">
+<script src="/vendor/pdf.min.js"></script>
+<script src="/vendor/marked.min.js"></script>
+<style>
+:root{
+  --bg:#e4e1d8; --panel:#f6f4ee; --panel-2:#ece9e2; --ink:#2c2a26; --muted:#6e685f;
+  --line:#d5d0c6; --gold:#7a6844; --fire:#c9923a; --fire-soft:rgba(214,176,92,.42);
+  --ok:#2c6b45; --ok-soft:#e4f0e6; --bad:#8a4038; --bad-soft:#f6e7e4;
+  --wait:#7a6230; --wait-soft:#f4ecd8; --paper:#fbfaf7;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);
+  font:15px/1.5 "Segoe UI",system-ui,sans-serif}
+button,select{font:inherit;color:var(--ink)}
+button{cursor:pointer;border:1px solid var(--line);background:var(--panel-2);
+  border-radius:8px;padding:6px 12px}
+button:hover{border-color:var(--gold)}
+button.primary{background:#3e4a40;border-color:#3e4a40;color:#f7f6f2}
+button.on{border-color:var(--fire);color:var(--fire)}
+select{padding:8px 12px;border-radius:8px;border:1px solid var(--line);
+  background:var(--panel-2)}
+.app{display:grid;grid-template-rows:auto 1fr;height:100vh}
+header{display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"time time" "left page" "status center";
+  align-items:center;gap:8px 12px;padding:10px 16px 8px;
+  border-bottom:1px solid var(--line);background:#efece6}
+.head-left{grid-area:left;display:flex;align-items:center;gap:10px;min-width:0}
+header .logo{font-family:Georgia,Palatino,"Times New Roman",serif;font-weight:700;letter-spacing:.4px;flex:none;font-size:18px}
+header .logo span{color:var(--fire)}
+#bookSel{flex:1;min-width:0;width:auto;font-size:17px;font-weight:600}
+.head-center{grid-area:center;display:flex;gap:8px;justify-content:center}
+header .pageinfo{grid-area:page;text-align:right;min-width:0}
+.pctline{font-size:15px;font-weight:700;color:var(--ink);font-variant-numeric:tabular-nums}
+.pctline b{color:#8a5a12}
+.checkpoint{display:flex;gap:4px;justify-content:flex-end;align-items:center;margin-top:2px}
+.checkpoint span{font-size:12px;color:var(--muted)}
+.checkpoint input{width:58px;padding:2px 6px;border:1px solid var(--line);border-radius:8px;
+  background:#fbfaf7;color:var(--ink);text-align:right;font:inherit;font-size:13px}
+.checkpoint button{width:28px;height:26px;padding:0;border-radius:8px;font-size:15px}
+#pageInfo{max-width:36vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  color:var(--muted);font-variant-numeric:tabular-nums;font-size:13px}
+.timebar{grid-area:time;display:flex;align-items:center;gap:8px;min-width:0;flex-wrap:wrap}
+.timebar .fold{margin:0}
+.timeextra{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.timebar.collapsed .timeextra{display:none}
+.spent{margin-left:auto;display:flex;align-items:center;gap:8px;flex:none}
+.readtime{display:flex;align-items:center;gap:6px;padding:3px 10px 3px 3px;
+  border:1px solid var(--line);border-radius:999px;background:#fbfaf7}
+.readtime .fold{width:22px;height:22px;font-size:13px}
+.readtime.collapsed{padding:2px;background:transparent;border-color:transparent}
+.readtime.collapsed .rt-body{display:none}
+.rt-k{display:block;font-size:10px;letter-spacing:.2px;color:var(--muted);line-height:1.15}
+.rt-body b{font-variant-numeric:tabular-nums;font-size:14px;font-weight:700;line-height:1.15}
+#clock{font-variant-numeric:tabular-nums;font-weight:700;min-width:52px}
+#timerLeft{font-variant-numeric:tabular-nums;color:var(--ink);min-width:72px}
+.timeextra input{width:52px;padding:2px 6px;border:1px solid var(--line);border-radius:8px;
+  background:#fbfaf7;text-align:right;font:inherit}
+.timeextra span{color:var(--muted);font-size:13px}
+.readstat{grid-area:status;display:flex;gap:4px;justify-self:start}
+.readstat button{padding:4px 8px;font-size:12px;border-radius:999px}
+.readstat button.on{background:#3e4a40;color:#f7f6f2;border-color:#3e4a40}
+.topbtn{position:relative}
+.badge{position:absolute;top:4px;right:4px;width:8px;height:8px;border-radius:50%;background:var(--fire)}
+.badge[hidden]{display:none}
+.main{display:grid;grid-template-columns:minmax(220px,280px) minmax(0,1fr) minmax(240px,320px);min-height:0}
+.main.toc-off{grid-template-columns:40px minmax(0,1fr) minmax(240px,320px)}
+.main.chat-off{grid-template-columns:minmax(220px,280px) minmax(0,1fr) 40px}
+.main.toc-off.chat-off{grid-template-columns:40px minmax(0,1fr) 40px}
+.stage{position:relative;min-width:0;overflow:hidden;min-height:0;background:
+  radial-gradient(ellipse at center, #ddd8ce 0%, #cfc9bd 78%)}
+#viewer{position:absolute;inset:12px;overflow:auto;padding:12px 8px 28px}
+.page{position:relative;margin:0 auto 18px;background:var(--paper);box-shadow:0 6px 18px rgba(60,50,30,.12)}
+.page canvas{display:block}
+.page .num{position:absolute;bottom:-18px;right:0;font-size:12px;color:var(--muted)}
+.textLayer{position:absolute;inset:0;overflow:hidden;line-height:1;z-index:2;
+  text-size-adjust:none;-webkit-text-size-adjust:none;transform-origin:0 0}
+.textLayer :is(span, br){color:transparent;position:absolute;white-space:pre;cursor:text;
+  transform-origin:0 0}
+.textLayer span.markedContent{top:0;height:0}
+.textLayer ::selection{background:rgba(90,110,96,.28)}
+.textLayer span.fire{background:rgba(214,206,160,.72);border-radius:2px}
+/* Пока тянется выделение, этот слой заставляет браузер брать только текст под курсором. */
+.textLayer .endOfContent{display:block;position:absolute;inset:100% 0 0;z-index:-1;
+  cursor:default;user-select:none}
+.textLayer.selecting .endOfContent{top:0}
+.empty{margin:auto;text-align:center;color:var(--muted);max-width:420px}
+.rail{display:flex;flex-direction:column;min-width:0;min-height:0;overflow:hidden;background:var(--panel)}
+.fold{flex:none;width:28px;height:28px;margin:8px;padding:0;border-radius:8px;font-size:16px;line-height:1}
+.rail.collapsed section{display:none}
+.rail.collapsed{align-items:center}
+.rail.left{border-right:1px solid var(--line)}
+.rail.right{border-left:1px solid var(--line)}
+.toc-pane{flex:1;min-height:0;display:flex;flex-direction:column}
+.pane-h{display:flex;align-items:center;gap:8px;padding:10px 12px 6px;
+  font-family:Georgia,serif;letter-spacing:.3px}
+.pane-h span{color:var(--gold);font-size:13px}
+#toc{overflow:auto;padding:4px 8px 8px;flex:1}
+.toc a{display:flex;gap:8px;align-items:baseline;padding:6px 8px;border-radius:8px;
+  color:var(--ink);text-decoration:none;font-size:14px;border:1px solid transparent}
+.toc a small{margin-left:auto;color:var(--muted);font-variant-numeric:tabular-nums}
+.toc a:hover{background:#e8e4da}
+.toc a.current{background:#e7eee4;border-color:#b7c4ae;box-shadow:inset 3px 0 0 var(--fire)}
+.toc a.read .dot{background:var(--fire);box-shadow:0 0 6px var(--fire)}
+.toc a.read span{color:#8a5a12;font-weight:650}
+.dot{width:7px;height:7px;border-radius:50%;background:#c2bbb0;flex:none}
+.toc-status{padding:0 12px 8px;color:var(--gold);font-size:12px;min-height:0}
+.toc-status:empty{display:none}
+.toc-foot{padding:8px 12px 10px;border-top:1px solid var(--line)}
+.chat-pane{flex:1;min-height:0;display:flex;flex-direction:column}
+#chatLog{flex:1;overflow:auto;padding:12px}
+.msg{margin-bottom:10px;font-size:14px}
+.msg.user{margin-left:28px;background:#e8e4da;border-radius:12px 12px 2px 12px;padding:8px 12px;white-space:pre-wrap}
+.msg.assistant p{margin:.4em 0}
+.msg.assistant ul,.msg.assistant ol{padding-left:1.2em;margin:.3em 0}
+.msg.error{background:var(--bad-soft);color:var(--bad);border-radius:10px;padding:8px 12px}
+.thinking{color:var(--muted);font-style:italic}
+.thinking::after{content:"";animation:dots 1.2s steps(4,end) infinite}
+@keyframes dots{0%{content:""}25%{content:"."}50%{content:".."}75%{content:"..."}}
+.chatbar{border-top:1px solid var(--line);padding:8px 10px;display:flex;flex-direction:column;gap:6px}
+.chatbar textarea{min-height:52px;max-height:120px}
+.chatbar .row{display:flex;gap:8px;align-items:center}
+.chatbar .row .spacer{flex:1}
+.chatbar small{color:var(--muted);font-size:12px}
+.hint{font-size:13px;color:var(--muted)}
+textarea{width:100%;font:inherit;font-size:14px;padding:8px;border-radius:8px;
+  border:1px solid var(--line);background:#fbfaf7;color:var(--ink);resize:vertical}
+.veil{position:fixed;inset:0;z-index:20;background:rgba(50,46,38,.28);
+  display:flex;align-items:flex-start;justify-content:center;padding:54px 24px 24px}
+.veil[hidden]{display:none}
+.bookwin{width:min(980px,100%);height:min(78vh,760px);background:#f7f5f0;border:1px solid var(--line);
+  border-radius:14px;box-shadow:0 20px 60px rgba(0,0,0,.5);display:flex;flex-direction:column;min-height:0}
+.bookwin header{display:flex;align-items:center;gap:12px;padding:12px 16px;border-bottom:1px solid var(--line)}
+.bookwin header h2{margin:0;font-family:Georgia,serif;font-size:22px;font-weight:600}
+.bookwin header .spacer{flex:1}
+.bookwin-body{display:grid;grid-template-columns:240px 1fr;min-height:0;flex:1}
+.notesheet{display:grid;grid-template-columns:240px minmax(0,1fr) minmax(0,1fr);min-height:0;flex:1}
+.note-left{display:flex;min-height:0;border-right:1px solid #2c2a26}
+.note-meter{width:14px;flex:none;margin:12px 8px;border:1px solid #2c2a26;background:#f4f1ea;position:relative}
+.note-meter i{position:absolute;left:0;right:0;top:0;background:#2c2a26}
+.note-chaps{flex:1;overflow:auto;padding:12px 10px;display:flex;flex-direction:column;gap:8px}
+.note-chaps button{text-align:center;background:#fbfaf7}
+.note-chaps button.on{border-color:#2c2a26;background:#e7eee4}
+.note-col{min-height:0;overflow:auto;padding:16px 18px 24px}
+.note-box{display:inline-block;border:1px solid #2c2a26;padding:14px 18px;margin:8px 0 16px;
+  font-family:Georgia,serif;font-size:18px;background:#fbfaf7}
+.note-add{display:flex;flex-direction:column;gap:6px;margin-bottom:14px}
+.note-add input,.note-add textarea{width:100%}
+.recall{position:absolute;left:16px;bottom:16px;z-index:4;max-width:min(420px,70%);
+  background:#f7f5f0;border:1px solid var(--line);border-radius:12px;padding:10px 12px;
+  box-shadow:0 8px 24px rgba(60,50,30,.16)}
+.recall[hidden]{display:none}
+.recall.collapsed .recall-body{display:none}
+.recall .q{font-weight:650}
+.recall .a{margin:6px 0 0;color:var(--muted)}
+.sidelist{overflow:auto;border-right:1px solid var(--line);padding:8px}
+.sidelist button{display:block;width:100%;text-align:left;margin-bottom:6px;background:transparent}
+.sidelist button.on{background:#e7eee4;border-color:var(--fire)}
+.sheet{overflow:auto;padding:14px 16px}
+.card{border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin-bottom:12px;background:#fbfaf7}
+.card h3{margin:0 0 4px;font-size:16px;font-family:Georgia,serif}
+.meta{font-size:12px;color:var(--muted);display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.meta a{color:var(--gold);cursor:pointer}
+.meta .x{margin-left:auto;cursor:pointer}
+.kind{font-size:11px;letter-spacing:.4px;text-transform:uppercase;color:#f7f4ec;background:var(--gold);
+  border-radius:4px;padding:1px 6px}
+.card .body p{margin:.45em 0}
+.card blockquote,.msg blockquote{margin:6px 0;padding:4px 10px;border-left:3px solid var(--fire)}
+.q{border-top:1px solid var(--line);padding:12px 0}
+.q .qt{font-weight:600;margin-bottom:8px}
+.opt{display:flex;gap:8px;padding:7px 10px;border:1px solid var(--line);border-radius:8px;margin:6px 0;cursor:pointer}
+.opt:hover{border-color:var(--gold)}
+.opt.chosen-ok{background:var(--ok-soft);border-color:var(--ok)}
+.opt.chosen-bad{background:var(--bad-soft);border-color:var(--bad)}
+.opt.right{border-color:var(--ok)}
+.opt.locked{cursor:default}
+.verdict{margin-top:8px;padding:8px 10px;border-radius:8px}
+.verdict.ok{background:var(--ok-soft);color:var(--ok)}
+.verdict.bad{background:var(--bad-soft);color:var(--bad)}
+.verdict.wait{background:var(--wait-soft);color:var(--wait)}
+.treewin{width:min(1280px,96vw);height:min(92vh,920px)}
+.tree-stage{position:relative;flex:1;min-height:0;display:flex}
+#treeScroll{position:relative;flex:1;overflow:hidden;cursor:grab;touch-action:none;background:
+  radial-gradient(ellipse at 50% 40%, #f7f5f0 0%, #e3ded3 74%)}
+#treeScroll.panning{cursor:grabbing}
+#tree{position:absolute;left:0;top:0;transform-origin:0 0}
+.tree-zoom{position:absolute;right:14px;bottom:14px;z-index:3;display:flex;gap:6px;align-items:center;
+  background:rgba(247,245,240,.92);border:1px solid var(--line);border-radius:10px;padding:6px}
+.tree-zoom span{min-width:44px;text-align:center;font-variant-numeric:tabular-nums;font-size:13px;color:var(--muted)}
+.talent{position:absolute;transform:translate(-50%,-50%);text-align:center}
+.orb{margin:0 auto;border-radius:50%;border:1px solid #c9c2b4;position:relative;
+  background:radial-gradient(circle at 40% 32%, #fff, #e7e2d6 74%);
+  display:flex;align-items:center;justify-content:center;padding:8px;
+  font-family:Georgia,serif;line-height:1.15;cursor:pointer;color:var(--ink)}
+.orb span{display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden;position:relative;z-index:1}
+.talent.lit .orb{border-color:#e2b15a;color:#3a2a12;
+  background:radial-gradient(circle at 38% 32%, #fff4d4, #f0c36a 48%, #e0a04a 80%);
+  animation:breathe 2.6s ease-in-out infinite}
+.talent.lit .orb::before{content:"";position:absolute;inset:-8px;border-radius:50%;z-index:-1;
+  background:conic-gradient(from 0deg, transparent 0 18%, rgba(255,210,120,.95), transparent 46%, rgba(255,150,40,.75), transparent 78%);
+  filter:blur(1.5px);animation:spin 3s linear infinite}
+@keyframes breathe{
+  0%,100%{box-shadow:0 0 10px 2px rgba(255,186,70,.45), 0 0 22px 6px rgba(255,140,30,.2)}
+  50%{box-shadow:0 0 18px 6px rgba(255,210,120,.9), 0 0 42px 14px rgba(255,140,30,.45)}
+}
+@keyframes spin{to{transform:rotate(360deg)}}
+.edge-lit{animation:flow 1.5s linear infinite}
+@keyframes flow{to{stroke-dashoffset:-32}}
+.talent.start .orb{border:2px solid #5c6b52;box-shadow:0 0 0 4px rgba(92,107,82,.28)}
+.talent.lit.start .orb{border-color:#e2b15a;
+  box-shadow:0 0 0 4px rgba(92,107,82,.28), 0 0 18px 6px rgba(255,186,70,.7)}
+.talent .mini{margin-top:6px;font-size:11px;padding:2px 8px}
+#selbar{position:fixed;display:none;gap:6px;z-index:30;background:#f7f5f0;border:1px solid var(--line);
+  border-radius:12px;padding:6px;box-shadow:0 10px 28px rgba(60,50,30,.16)}
+#toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#f7f5f0;color:var(--ink);
+  border:1px solid var(--line);padding:10px 16px;border-radius:10px;opacity:0;transition:opacity .2s;
+  pointer-events:none;z-index:40}
+#toast.show{opacity:1}
+  @media (max-width:980px){
+  header{grid-template-areas:"time time" "left left" "page page" "status status" "center center"}
+  .notesheet{grid-template-columns:1fr}
+  .main,.main.toc-off,.main.chat-off,.main.toc-off.chat-off{
+    grid-template-columns:1fr;grid-template-rows:32vh 1fr 34vh}
+  .main.toc-off{grid-template-rows:40px 1fr 34vh}
+  .main.chat-off{grid-template-rows:32vh 1fr 40px}
+  .main.toc-off.chat-off{grid-template-rows:40px 1fr 40px}
+  .rail.left,.rail.right{border:0;border-top:1px solid var(--line)}
+  .bookwin-body{grid-template-columns:1fr}
+  .sidelist{border-right:0;border-bottom:1px solid var(--line);max-height:140px}
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="timebar" id="timebar">
+      <button type="button" class="fold" id="foldTime" title="Свернуть часы">⌃</button>
+      <b id="clock">00:00</b>
+      <b id="timerLeft"></b>
+      <div class="timeextra">
+        <input id="timerH" type="number" min="0" max="48" value="3" title="Часы">
+        <span>ч</span>
+        <input id="timerM" type="number" min="0" max="59" value="0" title="Минуты">
+        <span>мин</span>
+        <button type="button" id="timerStart">Старт</button>
+        <button type="button" id="timerStop">Стоп</button>
+      </div>
+      <div class="spent">
+        <div class="readtime" id="readTotal">
+          <button type="button" class="fold" id="foldTotal" title="Свернуть общее время">⌃</button>
+          <div class="rt-body"><span class="rt-k">Все книги</span><b id="totalTime">0 мин</b></div>
+        </div>
+        <div class="readtime" id="readBook">
+          <button type="button" class="fold" id="foldBook" title="Свернуть время книги">⌃</button>
+          <div class="rt-body"><span class="rt-k">Эта книга</span><b id="bookTime">0 мин</b></div>
+        </div>
+      </div>
+    </div>
+    <div class="head-left">
+      <div class="logo">Book<span>Tutor</span></div>
+      <select id="bookSel" title=""><option value="">Выбери книгу…</option></select>
+      <button id="zoomOut" title="Мельче">−</button>
+      <button id="zoomIn" title="Крупнее">+</button>
+    </div>
+    <div class="head-center">
+      <button class="topbtn" id="openNotes">Заметки<span class="badge" id="notesBadge" hidden></span></button>
+      <button class="topbtn" id="openQuiz">Тесты<span class="badge" id="quizBadge" hidden></span></button>
+      <button class="topbtn" id="openTree">Древо</button>
+    </div>
+    <div class="pageinfo">
+      <div class="pctline" id="pctLine"></div>
+      <label class="checkpoint" title="Впиши страницу, до которой дочитал, и нажми галочку">
+        <span>до стр.</span>
+        <input id="pageMark" type="number" min="1" inputmode="numeric">
+        <button type="button" id="savePage" title="Сохранить: я дочитал до этой страницы">✓</button>
+      </label>
+      <div id="pageInfo"></div>
+    </div>
+    <div class="readstat" id="readStat" hidden>
+      <button type="button" data-st="unread">Не прочитано</button>
+      <button type="button" data-st="reading">Читаю</button>
+      <button type="button" data-st="done">Прочитано</button>
+    </div>
+  </header>
+  <div class="main" id="main">
+    <aside class="rail left" id="railToc">
+      <button type="button" class="fold" id="foldToc" title="Свернуть оглавление">‹</button>
+      <section class="toc-pane">
+        <div class="pane-h"><span>Оглавление</span></div>
+        <div class="toc-status" id="tocStatus"></div>
+        <div class="toc" id="toc"></div>
+        <div class="toc-foot"><button id="markRead">Дочитал эту главу</button></div>
+      </section>
+    </aside>
+    <div class="stage">
+      <div id="recall" class="recall" hidden>
+        <button type="button" class="fold" id="foldRecall" title="Свернуть напоминание">⌄</button>
+        <div class="recall-body">
+          <div class="meta">Вспомни · одна карточка на сегодня</div>
+          <div class="q" id="recallQ"></div>
+          <p class="a" id="recallA" hidden></p>
+          <div class="row" style="margin-top:8px">
+            <button type="button" id="recallShow">Показать</button>
+            <button type="button" id="recallNext">Другая</button>
+          </div>
+        </div>
+      </div>
+      <div id="viewer">
+        <div class="empty" id="emptyMsg">
+          <h2>Открой книгу</h2>
+          <p>Положи PDF в папку <b>books</b> и выбери его сверху.</p>
+        </div>
+      </div>
+    </div>
+    <aside class="rail right" id="railChat">
+      <button type="button" class="fold" id="foldChat" title="Свернуть чат">›</button>
+      <section class="chat-pane">
+        <div class="pane-h"><span>Чат</span></div>
+        <div id="chatLog"></div>
+        <div class="chatbar">
+          <textarea id="chatInput" placeholder="Напиши сообщение… Enter — отправить"></textarea>
+          <div class="row">
+            <small>Видит открытую страницу и выделение</small>
+            <div class="spacer"></div>
+            <button id="chatReset">Новый</button>
+            <button id="chatSend" class="primary">Отправить</button>
+          </div>
+        </div>
+      </section>
+    </aside>
+  </div>
+</div>
+
+<div class="veil" id="notesWin" hidden>
+  <div class="bookwin" style="width:min(1200px,96vw);height:min(92vh,860px)">
+    <header><h2>Заметки</h2><div class="spacer"></div><button data-close="notesWin">Закрыть</button></header>
+    <div class="notesheet">
+      <aside class="note-left">
+        <div class="note-meter" title="Сколько книги подтверждено"><i id="noteMeter"></i></div>
+        <div class="note-chaps" id="noteChapters"></div>
+      </aside>
+      <section class="note-col">
+        <div class="note-box">Словарик</div>
+        <form class="note-add" id="wordForm">
+          <input id="wordTitle" placeholder="Слово или выражение" maxlength="120">
+          <textarea id="wordBody" placeholder="Что оно значит" rows="2"></textarea>
+          <button type="submit" class="primary">В словарь</button>
+        </form>
+        <div id="glossary"></div>
+      </section>
+      <section class="note-col" style="border-left:1px solid #2c2a26">
+        <div class="note-box">Цитаты, текст, определения, вырезки из текста книги</div>
+        <form class="note-add" id="clipForm">
+          <input id="clipTitle" placeholder="О чём эта вырезка" maxlength="120">
+          <textarea id="clipBody" placeholder="Цитата или мысль своими словами" rows="3"></textarea>
+          <button type="submit" class="primary">Добавить</button>
+        </form>
+        <div id="excerpts"></div>
+      </section>
+    </div>
+  </div>
+</div>
+<div class="veil" id="quizWin" hidden>
+  <div class="bookwin">
+    <header><h2>Тесты</h2><div class="spacer"></div><button data-close="quizWin">Закрыть</button></header>
+    <div class="bookwin-body">
+      <nav class="sidelist" id="quizList"></nav>
+      <div class="sheet" id="quizzes"></div>
+    </div>
+  </div>
+</div>
+<div class="veil" id="treeWin" hidden>
+  <div class="bookwin treewin">
+    <header>
+      <h2>Древо знаний</h2>
+      <div class="hint">Первая глава слева сверху. Дальше по ряду, следующий ряд — в обратную сторону, по порядку.</div>
+      <div class="spacer"></div>
+      <button data-close="treeWin">Закрыть</button>
+    </header>
+    <div class="tree-stage">
+      <div id="treeScroll"><div id="tree"></div></div>
+      <div class="tree-zoom">
+        <button id="treeOut" title="Дальше">−</button>
+        <button id="treeFit" title="Показать всё древо">Вся карта</button>
+        <span id="treeZoomLabel">100%</span>
+        <button id="treeIn" title="Ближе">+</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="selbar"></div>
+<div id="toast"></div>
+
+<script>
+pdfjsLib.GlobalWorkerOptions.workerSrc = "/vendor/pdf.worker.min.js";
+
+const $ = s => document.querySelector(s);
+const viewer = $("#viewer");
+let pdf = null, book = "", scale = 1.3, pages = [], currentPage = 1, chapters = [];
+let lastVersion = null, seenQuizIds = new Set(), seenNoteIds = new Set(), firstLoad = true;
+let pageHighlights = [], readMarks = [], noteChapter = null, quizPick = null;
+let checkpoint = 0, pageMarkEdit = false, openGen = 0, loadTask = null, pageObserver = null;
+let trackPage = false, scrollGen = 0, places = {};
+
+function toast(msg){ const t=$("#toast"); t.textContent=msg; t.classList.add("show");
+  clearTimeout(t._h); t._h=setTimeout(()=>t.classList.remove("show"), 3200); }
+async function api(path, body){
+  const r = await fetch(path, body ? {method:"POST", headers:{"Content-Type":"application/json"},
+    body: JSON.stringify(body)} : {});
+  const raw = await r.text();
+  try { return JSON.parse(raw); }
+  catch { return {error: raw.slice(0, 300) || ("Ошибка " + r.status)}; }
+}
+function esc(s){ return String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
+function bookLabel(name){ return String(name).replace(/\.pdf$/i, ""); }
+function md(s){ try { return marked.parse(s || ""); } catch { return esc(s); } }
+function openWin(id){ $(id).hidden = false; }
+function closeWin(id){ $(id).hidden = true; }
+document.querySelectorAll("[data-close]").forEach(b => b.onclick = () => closeWin("#" + b.dataset.close));
+$("#openNotes").onclick = () => { $("#notesBadge").hidden = true; openWin("#notesWin"); };
+$("#openQuiz").onclick = () => { $("#quizBadge").hidden = true; openWin("#quizWin"); };
+$("#openTree").onclick = () => { openWin("#treeWin"); renderTree(); requestAnimationFrame(fitTree); };
+
+let bookStatus = "unread";
+let progressReady = false;
+function isRead(ch){
+  return readMarks.some(m => m.start ? m.start === ch.start : m.index === ch.index);
+}
+const STATUS_GROUPS = [["reading","Читаю"],["unread","Не прочитано"],["done","Прочитано"]];
+
+function coveredPages(){
+  const seen = new Set();
+  chapters.forEach(ch => {
+    if (!isRead(ch)) return;
+    for (let p = ch.start; p <= ch.end; p++) seen.add(p);
+  });
+  return seen.size;
+}
+function paintProgress(){
+  const box = $("#readStat");
+  const line = $("#pctLine");
+  if (!book || !pdf){
+    box.hidden = true;
+    line.textContent = "";
+    return;
+  }
+  box.hidden = false;
+  box.querySelectorAll("button").forEach(b => b.classList.toggle("on", b.dataset.st === bookStatus));
+  const total = pdf.numPages || 0;
+  const read = Math.min(total, Math.max(0, checkpoint || 0));
+  const pct = total ? Math.round(100 * read / total) : 0;
+  line.innerHTML = `<b>${pct}%</b> · ${read}/${total} страниц`;
+  const opt = [...$("#bookSel").options].find(o => o.value === book);
+  if (opt && progressReady) opt.textContent = `${pct}% · ${bookLabel(book)}`;
+}
+let booksGen = 0;
+async function fillBooks(openSaved){
+  const gen = ++booksGen;
+  const list = await api("/api/library");
+  if (gen !== booksGen) return;
+  const books = Array.isArray(list) ? list : [];
+  const sel = $("#bookSel");
+  const current = book || sel.value;
+  let html = '<option value="">Выбери книгу…</option>';
+  for (const [key, label] of STATUS_GROUPS){
+    const items = books.filter(b => b.status === key);
+    if (!items.length) continue;
+    html += `<optgroup label="${esc(label)}">` + items.map(b =>
+      `<option value="${esc(b.name)}">${b.percent}% · ${esc(bookLabel(b.name))}</option>`).join("") + "</optgroup>";
+  }
+  sel.innerHTML = html;
+  if (current && books.some(b => b.name === current)) sel.value = current;
+  const row = books.find(b => b.name === book);
+  if (row){
+    bookStatus = row.status;
+    checkpoint = row.checkpoint || 0;
+    progressReady = true;
+  }
+  paintProgress();
+  if (!openSaved) return;
+  const resume = await api("/api/resume");
+  if (gen !== booksGen) return;
+  places = (resume && resume.places) || {};
+  let saved = "";
+  try { saved = localStorage.getItem("bt-book") || ""; } catch {}
+  if (!saved) saved = (resume && resume.book) || "";
+  if (saved && books.some(b => b.name === saved)) { sel.value = saved; openBook(saved); }
+}
+function savedPage(name){
+  let local = 0;
+  try { local = parseInt(localStorage.getItem("bt-page-" + name), 10) || 0; } catch {}
+  if (local >= 1) return local;
+  return parseInt(places[name], 10) || 0;
+}
+function rememberPlace(name, n){
+  if (!name || n < 1) return;
+  places[name] = n;
+  try {
+    localStorage.setItem("bt-book", name);
+    localStorage.setItem("bt-page-" + name, String(n));
+  } catch {}
+}
+function flushPlace(){
+  if (!book || currentPage < 1 || !trackPage) return;
+  rememberPlace(book, currentPage);
+  const body = JSON.stringify({book, page: currentPage});
+  try {
+    if (navigator.sendBeacon("/api/state", new Blob([body], {type: "application/json"}))) return;
+  } catch {}
+  fetch("/api/state", {method:"POST", headers:{"Content-Type":"application/json"}, body, keepalive: true});
+}
+window.addEventListener("pagehide", flushPlace);
+$("#bookSel").onchange = e => e.target.value && openBook(e.target.value);
+$("#readStat").onclick = async (e) => {
+  const st = e.target.dataset && e.target.dataset.st;
+  if (!st || !book || st === bookStatus) return;
+  bookStatus = st;
+  paintProgress();
+  const saved = await api("/api/progress", {book, status: st});
+  if (saved && saved.status === st){
+    checkpoint = saved.checkpoint || 0;
+    progressReady = true;
+    paintProgress();
+  }
+  if (document.activeElement !== $("#bookSel")) await fillBooks(false);
+};
+
+async function openBook(name){
+  const gen = ++openGen;
+  const prev = pdf;
+  await flushReading();
+  if (book && book !== name && currentPage >= 1 && trackPage){
+    rememberPlace(book, currentPage);
+    sendState({book, page: currentPage});
+  }
+  const startPage = savedPage(name) || 1;
+  if (loadTask){ try { loadTask.destroy(); } catch {} loadTask = null; }
+  if (pageObserver){ pageObserver.disconnect(); pageObserver = null; }
+  trackPage = false;
+  scrollGen++;
+  clearTimeout(scrollTimer);
+  book = name;
+  noteChapter = null; quizPick = null; readMarks = [];
+  progressReady = false; checkpoint = 0; pageMarkEdit = false;
+  try { localStorage.setItem("bt-book", name); } catch {}
+  $("#emptyMsg")?.remove();
+  viewer.innerHTML = "";
+  pages = [];
+  loadTask = pdfjsLib.getDocument({url: "/book/" + encodeURIComponent(name),
+    cMapUrl: "/vendor/cmaps/", cMapPacked: true, standardFontDataUrl: "/vendor/standard_fonts/"});
+  let doc;
+  try { doc = await loadTask.promise; }
+  catch (e){
+    if (gen === openGen) toast("Не удалось открыть PDF. Выбери книгу ещё раз.");
+    return;
+  }
+  if (gen !== openGen){ try { doc.destroy(); } catch {} return; }
+  if (prev && prev !== doc){ try { prev.destroy(); } catch {} }
+  pdf = doc;
+  loadTask = null;
+  $("#bookSel").title = name;
+  await reloadToc();
+  if (gen !== openGen) return;
+  renderToc();
+  await buildPages();
+  if (gen !== openGen) return;
+  goToPage(startPage, false);
+  scrollGen++;
+  clearTimeout(scrollTimer);
+  trackPage = true;
+  rememberPlace(name, currentPage);
+  firstLoad = true; lastVersion = null;
+  await sendState({book: name, page: currentPage, selection: "", promote: true});
+  if (gen !== openGen) return;
+  await loadTimes();
+  await refreshData();
+  if (gen === openGen && document.activeElement !== $("#bookSel")) await fillBooks(false);
+}
+
+async function buildPages(){
+  pages = [];
+  const first = await pdf.getPage(1);
+  const vp0 = first.getViewport({scale});
+  for (let i = 1; i <= pdf.numPages; i++){
+    const div = document.createElement("div");
+    div.className = "page"; div.dataset.page = i;
+    div.style.width = vp0.width + "px"; div.style.height = vp0.height + "px";
+    div.innerHTML = `<span class="num">${i}</span>`;
+    viewer.appendChild(div);
+    pages.push({div, rendered:false});
+  }
+  if (pageObserver) pageObserver.disconnect();
+  pageObserver = new IntersectionObserver(entries => {
+    entries.forEach(e => { if (e.isIntersecting) renderPage(+e.target.dataset.page); });
+  }, {root: viewer, rootMargin: "800px 0px"});
+  pages.forEach(p => pageObserver.observe(p.div));
+}
+
+async function renderPage(n){
+  const p = pages[n-1]; if (!p || p.rendered) return;
+  const gen = openGen;
+  const doc = pdf;
+  if (!doc) return;
+  p.rendered = true;
+  try {
+    const page = await doc.getPage(n);
+    if (gen !== openGen || pdf !== doc){ p.rendered = false; return; }
+    const vp = page.getViewport({scale});
+    const ratio = window.devicePixelRatio || 1;
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.floor(vp.width * ratio); canvas.height = Math.floor(vp.height * ratio);
+    canvas.style.width = vp.width + "px"; canvas.style.height = vp.height + "px";
+    p.div.style.width = vp.width + "px"; p.div.style.height = vp.height + "px";
+    p.div.prepend(canvas);
+    await page.render({canvasContext: canvas.getContext("2d"), viewport: vp,
+      transform: ratio !== 1 ? [ratio,0,0,ratio,0,0] : null}).promise;
+    if (gen !== openGen || pdf !== doc) return;
+    const tl = document.createElement("div");
+    tl.className = "textLayer";
+    tl.style.setProperty("--scale-factor", String(vp.scale));
+    p.div.appendChild(tl);
+    await pdfjsLib.renderTextLayer({textContentSource: await page.getTextContent(),
+      container: tl, viewport: vp, textDivs: []}).promise;
+    if (gen !== openGen || pdf !== doc) return;
+    const end = document.createElement("div");
+    end.className = "endOfContent";
+    tl.appendChild(end);
+    if (gen !== openGen) return;
+    paintPage(p.div, n);
+  } catch {
+    if (gen === openGen) p.rendered = false;
+  }
+}
+
+function goToPage(n, smooth=true){
+  n = Math.max(1, Math.min(pdf?.numPages || 1, n));
+  const div = pages[n-1]?.div; if (!div) return;
+  viewer.scrollTo({top: div.offsetTop - 16, behavior: smooth ? "smooth" : "auto"});
+  setCurrent(n);
+}
+
+let scrollTimer;
+viewer.addEventListener("scroll", () => {
+  const gen = ++scrollGen;
+  clearTimeout(scrollTimer);
+  scrollTimer = setTimeout(() => {
+    if (gen !== scrollGen || !trackPage || !pages.length || document.hidden) return;
+    if (viewer.clientHeight < 80) return;
+    const mid = viewer.scrollTop + viewer.clientHeight / 3;
+    let n = 1;
+    for (const p of pages){ if (p.div.offsetTop <= mid) n = +p.div.dataset.page; else break; }
+    if (n !== currentPage) setCurrent(n);
+  }, 120);
+});
+
+function currentChapter(n){
+  let best = null;
+  for (const c of chapters) if (c.start <= n && n <= c.end && (!best || c.level >= best.level)) best = c;
+  return best;
+}
+function setCurrent(n){
+  currentPage = n;
+  const ch = currentChapter(n);
+  $("#pageInfo").textContent = `стр. ${n} из ${pdf?.numPages || "?"}` + (ch ? ` · ${ch.title}` : "");
+  document.querySelectorAll(".toc a").forEach(a => a.classList.toggle("current", ch && +a.dataset.index === ch.index));
+  const cur = document.querySelector(".toc a.current");
+  if (cur) cur.scrollIntoView({block:"nearest"});
+  const btn = $("#markRead");
+  if (btn){
+    const done = ch && isRead(ch);
+    btn.textContent = done ? "Снять отметку «дочитал»" : "Дочитал эту главу";
+    btn.disabled = !ch;
+  }
+  if (trackPage) rememberPlace(book, n);
+  const mark = $("#pageMark");
+  if (mark && !pageMarkEdit) mark.value = n;
+  if (trackPage) sendStateDebounced({book, page: n});
+}
+$("#pageMark").oninput = () => { pageMarkEdit = true; };
+$("#savePage").onclick = async () => {
+  if (!book || !pdf) return toast("Сначала открой книгу");
+  const total = pdf.numPages || 1;
+  let n = parseInt($("#pageMark").value, 10);
+  if (!n) n = currentPage;
+  n = Math.max(1, Math.min(total, n));
+  $("#pageMark").value = n;
+  pageMarkEdit = false;
+  checkpoint = n;
+  readMarks = chapters.filter(c => c.end <= n).map(c => ({index: c.index, start: c.start}));
+  if (n >= total) bookStatus = "done";
+  else if (bookStatus === "unread") bookStatus = "reading";
+  showRead();
+  const r = await api("/api/checkpoint", {book, page: n});
+  if (r.error){ toast(r.error); return; }
+  if (typeof r.checkpoint === "number") checkpoint = r.checkpoint;
+  bookStatus = r.status || bookStatus;
+  progressReady = true;
+  paintProgress();
+  toast(`Сохранено: дочитано до стр. ${n}`);
+  refreshData();
+  if (document.activeElement !== $("#bookSel")) fillBooks(false);
+};
+let stateTimer;
+function sendState(s){ return api("/api/state", s); }
+function sendStateDebounced(s){
+  const name = book;
+  clearTimeout(stateTimer);
+  stateTimer = setTimeout(() => { if (book === name) sendState(s); }, 400);
+}
+$("#zoomIn").onclick = () => rezoom(scale * 1.15);
+$("#zoomOut").onclick = () => rezoom(scale / 1.15);
+async function rezoom(s){
+  if (!pdf) return; const keep = currentPage; scale = Math.max(.5, Math.min(3, s));
+  viewer.innerHTML = ""; await buildPages(); goToPage(keep, false);
+}
+
+async function reloadToc(){
+  if (!book) return;
+  const t = await api("/api/toc?book=" + encodeURIComponent(book));
+  const list = Array.isArray(t) ? t : (t.chapters || []);
+  const pending = !Array.isArray(t) && !!t.pending;
+  chapters = list;
+  const st = $("#tocStatus");
+  if (st) st.textContent = pending ? "ИИ читает книгу и расписывает главы…" : "";
+}
+function renderToc(){
+  $("#toc").innerHTML = chapters.map(c =>
+    `<a data-index="${c.index}" data-start="${c.start}" class="${isRead(c) ? "read" : ""}" style="padding-left:${8 + (c.level-1)*14}px">
+      <i class="dot"></i><span>${esc(c.title)}</span><small>${c.start}</small></a>`).join("") || "<p class='hint'>Оглавления нет.</p>";
+  document.querySelectorAll(".toc a").forEach(a => a.onclick = () => goToPage(+a.dataset.start));
+  setCurrent(currentPage);
+}
+function showRead(){
+  renderToc();
+  renderTree();
+  paintProgress();
+}
+function setMark(index, start, done){
+  readMarks = readMarks.filter(m => m.index !== index && !(start && m.start === start));
+  if (done) readMarks.push({index, start: start || null});
+}
+async function toggleRead(index){
+  const name = book;
+  const ch = chapters.find(c => c.index === index);
+  if (!name || !ch) return;
+  const done = !isRead(ch);
+  setMark(ch.index, ch.start, done);
+  showRead();
+  const r = await api("/api/read", {book: name, index: ch.index, start: ch.start, done});
+  if (book !== name) return;
+  if (r.error){
+    setMark(ch.index, ch.start, !done);
+    showRead();
+    toast(r.error);
+    return;
+  }
+  toast(done ? "Глава отмечена прочитанной" : "Отметка снята");
+  refreshData();
+}
+$("#markRead").onclick = () => {
+  const ch = currentChapter(currentPage);
+  if (!ch || !book) return toast("Сначала открой книгу");
+  toggleRead(ch.index);
+};
+
+function normText(s){ return String(s || "").replace(/\s+/g, " ").trim(); }
+function paintAll(){ for (const p of pages) if (p.rendered) paintPage(p.div, +p.div.dataset.page); }
+function paintPage(div, n){
+  const spans = [...div.querySelectorAll(".textLayer span")].filter(s => (s.textContent || "").trim());
+  spans.forEach(s => s.classList.remove("fire"));
+  const marks = pageHighlights.filter(h => h.page === n);
+  if (!marks.length || !spans.length) return;
+  let acc = "";
+  const parts = spans.map(span => {
+    const t = normText(span.textContent);
+    if (acc) acc += " ";
+    const a = acc.length;
+    acc += t;
+    return {span, a, b: acc.length};
+  });
+  const hay = acc.toLowerCase();
+  for (const h of marks){
+    const needle = normText(h.text).toLowerCase();
+    if (needle.length < 2) continue;
+    const at = hay.indexOf(needle);
+    if (at < 0) continue;
+    const end = at + needle.length;
+    parts.forEach(({span, a, b}) => {
+      const overlap = Math.min(b, end) - Math.max(a, at);
+      if (overlap > 0 && overlap >= Math.min(2, b - a) ) span.classList.add("fire");
+    });
+  }
+}
+function pageSelection(){
+  const sel = window.getSelection();
+  if (!sel || sel.isCollapsed || !sel.rangeCount) return null;
+  const range = sel.getRangeAt(0);
+  const node = range.commonAncestorContainer;
+  const el = node.nodeType === 1 ? node : node.parentElement;
+  let page = el?.closest?.(".page");
+  if (!page || !viewer.contains(page)){
+    const anchor = sel.anchorNode?.nodeType === 1 ? sel.anchorNode : sel.anchorNode?.parentElement;
+    page = anchor?.closest?.(".page");
+  }
+  if (!page || !viewer.contains(page)) return null;
+  const text = normText(range.toString());
+  if (!text) return null;
+  return {text, page: +page.dataset.page, pageEl: page, range};
+}
+viewer.addEventListener("pointerdown", e => {
+  const layer = e.target.closest?.(".textLayer");
+  if (!layer || !viewer.contains(layer)) return;
+  layer.classList.add("selecting");
+});
+window.addEventListener("pointerup", () => {
+  document.querySelectorAll(".textLayer.selecting").forEach(l => l.classList.remove("selecting"));
+});
+window.addEventListener("pointercancel", () => {
+  document.querySelectorAll(".textLayer.selecting").forEach(l => l.classList.remove("selecting"));
+});
+
+const selbar = $("#selbar");
+let selText = "", selPage = 1;
+function isWord(text){
+  return text.length <= 42 && !/[\n.!?…]/.test(text) && text.split(/\s+/).length <= 3;
+}
+document.addEventListener("mouseup", e => {
+  if (selbar.contains(e.target)) return;
+  setTimeout(() => {
+    const picked = pageSelection();
+    if (!picked) { selbar.style.display = "none"; return; }
+    selText = picked.text;
+    selPage = picked.page;
+    const word = isWord(selText);
+    selbar.innerHTML = (word
+      ? `<button data-act="mean">Посмотреть значение</button>`
+      : `<button data-act="ask" class="primary">Спросить у чата</button>`)
+      + `<button data-act="mark">Подсветить</button>`;
+    const rects = picked.range.getClientRects();
+    const r = rects.length ? rects[0] : picked.pageEl.getBoundingClientRect();
+    selbar.style.display = "flex";
+    selbar.style.left = Math.min(window.innerWidth - 280, Math.max(8, r.left)) + "px";
+    selbar.style.top = Math.max(8, r.top - 48) + "px";
+    sendState({book, selection: selText, selection_page: selPage});
+  }, 10);
+});
+selbar.addEventListener("click", async e => {
+  const act = e.target.closest("button")?.dataset.act;
+  if (!act) return;
+  selbar.style.display = "none";
+  if (act === "mark"){
+    const text = normText(selText);
+    const pageNo = selPage;
+    const pageEl = pages[pageNo - 1]?.div;
+    if (!text || !book) return;
+    pageHighlights.push({book, page: pageNo, text});
+    if (pageEl) paintPage(pageEl, pageNo);
+    window.getSelection()?.removeAllRanges();
+    const r = await api("/api/highlight", {book, page: pageNo, text});
+    if (r.error){
+      pageHighlights.pop();
+      if (pageEl) paintPage(pageEl, pageNo);
+      toast(r.error);
+      return;
+    }
+    toast("Текст подсвечен");
+    refreshData();
+    return;
+  }
+  const prompt = act === "mean"
+    ? `Что значит «${selText}» в этом месте книги? Объясни просто.`
+    : `Объясни этот фрагмент простыми словами:\n«${selText}»`;
+  window.getSelection()?.removeAllRanges();
+  $("#chatInput").value = prompt;
+  sendChat();
+});
+
+let refreshGen = 0;
+async function refreshData(){
+  if (!book) return;
+  const gen = ++refreshGen;
+  const forBook = book;
+  const d = await api("/api/data?book=" + encodeURIComponent(forBook));
+  if (gen !== refreshGen || forBook !== book || d.error) return;
+  readMarks = (d.read_marks || []).map(m => ({index: m.chapter_index, start: m.start_page || null}));
+  if (!readMarks.length) readMarks = (d.read || []).map(index => ({index, start: null}));
+  if (d.progress && d.progress.status){
+    bookStatus = d.progress.status;
+    checkpoint = d.progress.checkpoint || 0;
+    progressReady = true;
+  }
+  pageHighlights = d.highlights || [];
+  await reloadToc();
+  if (gen !== refreshGen || forBook !== book) return;
+  renderToc();
+  paintAll();
+  renderNotes(d.notes || [], d.highlights || []);
+  renderQuizzes(d.quizzes || []);
+  renderChat(d.chat || [], d.claude_found, d.claude_logged_in);
+  if (!$("#treeWin").hidden) renderTree();
+  paintProgress();
+  firstLoad = false;
+}
+
+function chapterOfPage(page){
+  let best = null;
+  for (const c of chapters) if (c.start <= page && page <= c.end && (!best || c.level >= best.level)) best = c;
+  return best;
+}
+function inNoteChapter(page, title){
+  if (!noteChapter) return true;
+  if (title && title === noteChapter) return true;
+  const ch = chapterOfPage(page || 0);
+  return !!(ch && ch.title === noteChapter);
+}
+function renderNotes(notes, hls){
+  const fresh = notes.filter(n => !seenNoteIds.has(n.id));
+  notes.forEach(n => seenNoteIds.add(n.id));
+  if (!firstLoad && fresh.length){ $("#notesBadge").hidden = false; toast("Новая заметка: " + fresh[0].title); }
+  const meter = $("#noteMeter");
+  if (meter){
+    const total = pdf?.numPages || 0;
+    meter.style.height = total ? Math.min(100, Math.round(100 * (checkpoint || 0) / total)) + "%" : "0%";
+  }
+  const list = chapters.length ? chapters.map(c => c.title) : [...new Set(notes.map(n => n.chapter).filter(Boolean))];
+  if (noteChapter && !list.includes(noteChapter)) noteChapter = null;
+  const host = $("#noteChapters");
+  if (host){
+    host.innerHTML = `<button data-ch="" class="${noteChapter?"":"on"}">Все главы</button>` +
+      list.map(t => `<button data-ch="${esc(t)}" class="${t===noteChapter?"on":""}">${esc(t)}</button>`).join("");
+    host.querySelectorAll("button").forEach(b => b.onclick = () => { noteChapter = b.dataset.ch || null; renderNotes(notes, hls); });
+  }
+  const words = notes.filter(n => (n.kind === "definition" || n.kind === "word") && inNoteChapter(n.page, n.chapter));
+  const clips = [
+    ...hls.filter(h => inNoteChapter(h.page, "")).map(h => ({...h, _hl:true})),
+    ...notes.filter(n => n.kind !== "definition" && n.kind !== "word" && inNoteChapter(n.page, n.chapter)),
+  ];
+  const gloss = $("#glossary");
+  if (gloss){
+    gloss.innerHTML = words.map(n => `
+      <div class="card"><div class="meta"><a data-page="${n.page}">стр. ${n.page}</a>
+        <span class="x" data-del="note:${n.id}">✕</span></div>
+        <h3>${esc(n.title)}</h3><div class="body">${md(n.content)}</div></div>`).join("")
+      || "<p class='hint'>Словаря пока нет. Добавь слово сверху или попроси чат сохранить определение.</p>";
+    bindCommon(gloss);
+  }
+  const ex = $("#excerpts");
+  if (ex){
+    ex.innerHTML = clips.map(n => n._hl ? `
+      <div class="card"><div class="meta"><a data-page="${n.page}">стр. ${n.page}</a>
+        <span class="x" data-del="highlight:${n.id}">✕</span></div>
+        <blockquote>${esc(n.text)}</blockquote></div>` : `
+      <div class="card"><div class="meta"><a data-page="${n.page}">стр. ${n.page}</a>
+        <span class="x" data-del="note:${n.id}">✕</span></div>
+        <h3>${esc(n.title)}</h3><div class="body">${md(n.content)}</div></div>`).join("")
+      || "<p class='hint'>Вырезок пока нет. Подсвети фразу в книге или добавь её здесь.</p>";
+    bindCommon(ex);
+  }
+  showRecall(notes, hls);
+}
+let recallPool = [], recallAt = 0, recallSeeded = false, recallKey = "";
+function paintRecallItem(){
+  const item = recallPool[recallAt % recallPool.length];
+  const key = (item.q || "") + "\n" + (item.a || "");
+  if (key === recallKey) return;
+  recallKey = key;
+  $("#recallQ").textContent = item.q || "Заметка";
+  $("#recallA").textContent = item.a || "";
+  $("#recallA").hidden = true;
+  $("#recallShow").textContent = "Показать";
+}
+function showRecall(notes, hls){
+  const box = $("#recall");
+  if (!box) return;
+  recallPool = [];
+  (notes || []).filter(n => n.kind === "definition" || n.kind === "word").forEach(n => {
+    recallPool.push({q: n.title, a: n.content});
+  });
+  (hls || []).forEach(h => recallPool.push({q: "Что здесь сказано?", a: h.text}));
+  (notes || []).filter(n => n.kind !== "definition" && n.kind !== "word" && n.title).forEach(n => {
+    recallPool.push({q: n.title, a: n.content});
+  });
+  if (!recallPool.length){ box.hidden = true; return; }
+  box.hidden = false;
+  if (!recallSeeded){
+    recallAt = Math.floor(Date.now() / 86400000) % recallPool.length;
+    recallSeeded = true;
+  }
+  paintRecallItem();
+}
+
+function renderQuizzes(quizzes){
+  const fresh = quizzes.filter(q => !seenQuizIds.has(q.id));
+  quizzes.forEach(q => seenQuizIds.add(q.id));
+  if (!firstLoad && fresh.length){ $("#quizBadge").hidden = false; toast("Новый тест: " + fresh[0].title); }
+  if (!quizzes.some(q => q.id === quizPick)) quizPick = quizzes[0]?.id ?? null;
+  $("#quizList").innerHTML = quizzes.map(q =>
+    `<button data-id="${q.id}" class="${q.id===quizPick?"on":""}">${esc(q.title)}</button>`).join("")
+    || "<p class='hint'>Тестов пока нет.</p>";
+  $("#quizList").querySelectorAll("button").forEach(b => b.onclick = () => { quizPick = +b.dataset.id; renderQuizzes(quizzes); });
+  const open = document.querySelectorAll("#quizzes textarea");
+  const drafts = {}; open.forEach(t => drafts[t.dataset.key] = t.value);
+  const qz = quizzes.find(q => q.id === quizPick);
+  if (!qz){ $("#quizzes").innerHTML = "<p class='hint'>Попроси чат сделать тест по главе.</p>"; return; }
+  const qs = qz.questions, A = qz.answers;
+  $("#quizzes").innerHTML = `<h3>${esc(qz.title)}</h3><div class="meta">${esc(qz.chapter)}</div>` + qs.map((q, i) => {
+    const a = A[i];
+    let inner = "";
+    if (q.type === "choice"){
+      inner = q.options.map((o, oi) => {
+        let cls = "opt";
+        if (a){ cls += " locked";
+          if (+a.answer === oi) cls += a.correct ? " chosen-ok" : " chosen-bad";
+          else if (oi === q.answer && !a.correct) cls += " right"; }
+        return `<div class="${cls}" data-quiz="${qz.id}" data-q="${i}" data-opt="${oi}"><span>${String.fromCharCode(65+oi)}.</span><span>${esc(o)}</span></div>`;
+      }).join("");
+      if (a) inner += `<div class="verdict ${a.correct ? "ok" : "bad"}">${a.correct ? "Верно" : "Неверно"}
+        ${q.explanation ? `<div class="ex">${md(q.explanation)}</div>` : ""}</div>`;
+    } else {
+      const key = qz.id + ":" + i;
+      if (!a){
+        inner = `<textarea data-key="${key}" placeholder="Ответь своими словами…">${esc(drafts[key] || "")}</textarea>
+          <button class="primary" style="margin-top:6px" data-send="${key}">Отправить ответ</button>`;
+      } else {
+        inner = `<blockquote>${esc(a.answer)}</blockquote>`;
+        inner += a.correct === null
+          ? `<div class="verdict wait">Ждёт проверки. Напиши в чат: «проверь тест»</div>`
+          : `<div class="verdict ${a.correct ? "ok" : "bad"}">${a.correct ? "Засчитано" : "Не засчитано"}
+              ${a.feedback ? `<div>${md(a.feedback)}</div>` : ""}</div>`;
+      }
+    }
+    return `<div class="q"><div class="qt">${i+1}. ${esc(q.question)}</div>${inner}
+      ${q.page ? `<div class="meta"><a data-page="${q.page}">стр. ${q.page}</a></div>` : ""}</div>`;
+  }).join("") + `<p><span class="x" data-del="quiz:${qz.id}">Удалить тест</span></p>`;
+  document.querySelectorAll("#quizzes .opt:not(.locked)").forEach(el => el.onclick = async () => {
+    await api("/api/answer", {quiz_id: +el.dataset.quiz, q_index: +el.dataset.q, answer: +el.dataset.opt});
+    refreshData();
+  });
+  document.querySelectorAll("#quizzes [data-send]").forEach(b => b.onclick = async () => {
+    const [qid, qi] = b.dataset.send.split(":");
+    const t = document.querySelector(`textarea[data-key="${b.dataset.send}"]`);
+    if (!t.value.trim()) return toast("Сначала напиши ответ");
+    await api("/api/answer", {quiz_id: +qid, q_index: +qi, answer: t.value.trim()});
+    refreshData();
+  });
+  bindCommon($("#quizzes"));
+}
+
+function bindCommon(root){
+  root.querySelectorAll("a[data-page]").forEach(a => a.onclick = e => {
+    e.preventDefault(); closeWin("#notesWin"); closeWin("#quizWin"); goToPage(+a.dataset.page);
+  });
+  root.querySelectorAll("[data-del]").forEach(x => x.onclick = async e => {
+    e.preventDefault(); e.stopPropagation();
+    const [kind, id] = x.dataset.del.split(":");
+    await api("/api/delete", {kind, id: +id}); refreshData();
+  });
+}
+
+function layoutGraph(list){
+  const nodes = [...list].sort((a, b) => a.start - b.start || a.index - b.index).map(c => {
+    const pages = Math.max(1, (c.end || c.start) - c.start + 1);
+    const r = Math.max(36, Math.min(78, Math.round(30 + Math.sqrt(pages) * 6)));
+    return {...c, pages, r};
+  });
+  const n = nodes.length;
+  if (!n) return {nodes, parent: [], width: 400, height: 240};
+  const cols = n <= 4 ? n : Math.min(8, Math.max(5, Math.ceil(Math.sqrt(n * 1.6))));
+  const dx = 220, dy = 210;
+  nodes.forEach((node, i) => {
+    const row = Math.floor(i / cols);
+    const col = row % 2 ? (cols - 1 - (i % cols)) : (i % cols);
+    node.x = 130 + col * dx;
+    node.y = 120 + row * dy;
+  });
+  const parent = nodes.map((_, i) => i ? i - 1 : null);
+  const rows = Math.ceil(n / cols);
+  return {nodes, parent, width: 180 + cols * dx, height: 180 + rows * dy};
+}
+let treeCam = {x: 40, y: 40, scale: 1};
+let treeSize = {w: 1, h: 1};
+function applyTreeCam(){
+  const host = $("#tree");
+  host.style.transform = `translate(${treeCam.x}px, ${treeCam.y}px) scale(${treeCam.scale})`;
+  const label = $("#treeZoomLabel");
+  if (label) label.textContent = Math.round(treeCam.scale * 100) + "%";
+}
+function fitTree(){
+  const sc = $("#treeScroll");
+  if (!sc || !treeSize.w) return;
+  const pad = 48;
+  const scale = Math.max(0.06, Math.min(1.2, Math.min(
+    (sc.clientWidth - pad) / treeSize.w,
+    (sc.clientHeight - pad) / treeSize.h)));
+  treeCam.scale = scale;
+  treeCam.x = (sc.clientWidth - treeSize.w * scale) / 2;
+  treeCam.y = (sc.clientHeight - treeSize.h * scale) / 2;
+  applyTreeCam();
+}
+function zoomTreeAt(cx, cy, next){
+  next = Math.max(0.06, Math.min(2.6, next));
+  const k = next / treeCam.scale;
+  treeCam.x = cx - (cx - treeCam.x) * k;
+  treeCam.y = cy - (cy - treeCam.y) * k;
+  treeCam.scale = next;
+  applyTreeCam();
+}
+function renderTree(){
+  const host = $("#tree");
+  if (!chapters.length){ host.innerHTML = "<p class='hint' style='padding:20px'>Открой книгу — древо соберётся по главам.</p>"; return; }
+  const {nodes, parent, width, height} = layoutGraph(chapters, book || "book");
+  const lines = [];
+  for (let i = 0; i < nodes.length; i++){
+    if (parent[i] == null) continue;
+    const a = nodes[parent[i]], b = nodes[i];
+    const lit = isRead(b);
+    const stroke = lit ? "#c9923a" : "#b7b0a4";
+    const extra = lit ? ' class="edge-lit" stroke-dasharray="7 9"' : "";
+    lines.push(`<line x1="${a.x}" y1="${a.y}" x2="${b.x}" y2="${b.y}" stroke="${stroke}" stroke-width="${lit ? 2.2 : 1.3}"${extra}/>`);
+  }
+  treeSize = {w: width, h: height};
+  host.style.width = width + "px";
+  host.style.height = height + "px";
+  host.innerHTML = `<svg width="${width}" height="${height}" style="position:absolute;inset:0;overflow:visible">${lines.join("")}</svg>`
+    + nodes.map(n => {
+      const lit = isRead(n);
+      const d = n.r * 2;
+      const fs = Math.max(11, Math.min(15, Math.round(n.r / 4.4)));
+      const start = n === nodes[0] ? " start" : "";
+      return `<div class="talent ${lit ? "lit" : ""}${start}" style="left:${n.x}px;top:${n.y}px;width:${d}px" title="${esc(n.title)}">
+        <div class="orb" data-start="${n.start}" style="width:${d}px;height:${d}px;font-size:${fs}px"><span>${esc(n.title)}</span></div>
+        <button class="mini" data-read="${n.index}">${lit ? "Знаю" : "Дочитал"}</button></div>`;
+    }).join("");
+  applyTreeCam();
+  host.querySelectorAll(".orb").forEach(o => o.onclick = () => { closeWin("#treeWin"); goToPage(+o.dataset.start); });
+  host.querySelectorAll("[data-read]").forEach(b => b.onclick = e => {
+    e.stopPropagation();
+    toggleRead(+b.dataset.read);
+  });
+}
+
+(function bindTreeMap(){
+  const sc = $("#treeScroll");
+  if (!sc) return;
+  sc.addEventListener("wheel", e => {
+    if ($("#treeWin").hidden) return;
+    e.preventDefault();
+    const r = sc.getBoundingClientRect();
+    const factor = e.deltaY < 0 ? 1.12 : 1 / 1.12;
+    zoomTreeAt(e.clientX - r.left, e.clientY - r.top, treeCam.scale * factor);
+  }, {passive: false});
+  let drag = null;
+  sc.addEventListener("pointerdown", e => {
+    if (e.target.closest("button, .orb, a")) return;
+    drag = {x: e.clientX, y: e.clientY, ox: treeCam.x, oy: treeCam.y, pid: e.pointerId};
+    sc.setPointerCapture(e.pointerId);
+    sc.classList.add("panning");
+  });
+  sc.addEventListener("pointermove", e => {
+    if (!drag || e.pointerId !== drag.pid) return;
+    treeCam.x = drag.ox + (e.clientX - drag.x);
+    treeCam.y = drag.oy + (e.clientY - drag.y);
+    applyTreeCam();
+  });
+  const endDrag = e => {
+    if (!drag || (e && e.pointerId !== drag.pid)) return;
+    drag = null;
+    sc.classList.remove("panning");
+  };
+  sc.addEventListener("pointerup", endDrag);
+  sc.addEventListener("pointercancel", endDrag);
+  $("#treeIn").onclick = () => zoomTreeAt(sc.clientWidth / 2, sc.clientHeight / 2, treeCam.scale * 1.25);
+  $("#treeOut").onclick = () => zoomTreeAt(sc.clientWidth / 2, sc.clientHeight / 2, treeCam.scale / 1.25);
+  $("#treeFit").onclick = fitTree;
+})();
+
+let lastChatSig = "";
+function renderChat(msgs, claudeFound, loggedIn){
+  const log = $("#chatLog");
+  const sig = JSON.stringify(msgs.map(m => [m.id, m.status, m.text.length])) + claudeFound + loggedIn;
+  if (sig === lastChatSig) return;
+  lastChatSig = sig;
+  const atBottom = log.scrollHeight - log.scrollTop - log.clientHeight < 80;
+  let html = "";
+  if (!msgs.length){
+    html = `<div class="hint">${claudeFound === false ? "Программа Claude не найдена."
+      : loggedIn === false ? "Отправь сообщение — откроется вход в аккаунт Claude."
+      : "Спроси что угодно по открытой странице."}</div>`;
+  }
+  html += msgs.map(m => {
+    if (m.role === "user") return `<div class="msg user">${esc(m.text)}</div>`;
+    if (m.status === "thinking") return `<div class="msg assistant thinking">Думает</div>`;
+    if (m.status === "error") return `<div class="msg error">${md(m.text)}</div>`;
+    return `<div class="msg assistant">${md(m.text)}</div>`;
+  }).join("");
+  log.innerHTML = html;
+  const thinking = msgs.some(m => m.status === "thinking");
+  $("#chatSend").disabled = thinking;
+  $("#chatSend").textContent = thinking ? "Ждём…" : "Отправить";
+  if (atBottom || (msgs.length && msgs.at(-1).role === "user") || thinking) log.scrollTop = log.scrollHeight;
+}
+async function sendChat(){
+  const inp = $("#chatInput"); const text = inp.value.trim();
+  if (!text) return;
+  if (!book) return toast("Сначала открой книгу");
+  if ($("#chatSend").disabled) return toast("Ответ ещё печатается");
+  inp.value = "";
+  try {
+    const r = await api("/api/chat", {book, text});
+    if (r.error) { toast(r.error); inp.value = text; return; }
+    refreshData();
+  } catch { toast("Не удалось отправить"); inp.value = text; }
+}
+$("#chatSend").onclick = sendChat;
+$("#chatInput").addEventListener("keydown", e => {
+  if (e.key === "Enter" && !e.shiftKey){ e.preventDefault(); sendChat(); }
+});
+$("#chatReset").onclick = async () => {
+  if (!book) return;
+  await api("/api/chat/reset", {book}); lastChatSig = ""; refreshData();
+  toast("Новый разговор. Заметки и тесты на месте.");
+};
+
+setInterval(async () => {
+  if (!book) return;
+  try {
+    const {version} = await api("/api/version");
+    const waiting = !!document.querySelector("#chatLog .thinking");
+    if (lastVersion !== null && version !== lastVersion && document.activeElement !== $("#bookSel"))
+      fillBooks(false);
+    if (lastVersion !== null && (version !== lastVersion || waiting)){
+      if (document.activeElement?.closest?.("#quizzes") && document.activeElement.tagName === "TEXTAREA") return;
+      refreshData();
+    }
+    lastVersion = version;
+  } catch {}
+}, 2000);
+
+function applyRails(){
+  let tocOff = false, chatOff = false;
+  try {
+    tocOff = localStorage.getItem("bt-toc") === "off";
+    chatOff = localStorage.getItem("bt-chat") === "off";
+  } catch {}
+  $("#main").classList.toggle("toc-off", tocOff);
+  $("#main").classList.toggle("chat-off", chatOff);
+  $("#railToc").classList.toggle("collapsed", tocOff);
+  $("#railChat").classList.toggle("collapsed", chatOff);
+  $("#foldToc").textContent = tocOff ? "›" : "‹";
+  $("#foldChat").textContent = chatOff ? "‹" : "›";
+  $("#foldToc").title = tocOff ? "Развернуть оглавление" : "Свернуть оглавление";
+  $("#foldChat").title = chatOff ? "Развернуть чат" : "Свернуть чат";
+}
+$("#foldToc").onclick = () => {
+  const off = !$("#main").classList.contains("toc-off");
+  try { localStorage.setItem("bt-toc", off ? "off" : "on"); } catch {}
+  applyRails();
+};
+$("#foldChat").onclick = () => {
+  const off = !$("#main").classList.contains("chat-off");
+  try { localStorage.setItem("bt-chat", off ? "off" : "on"); } catch {}
+  applyRails();
+};
+applyRails();
+
+(function bindTime(){
+  const bar = $("#timebar");
+  try { if (localStorage.getItem("bt-time") === "off") bar.classList.add("collapsed"); } catch {}
+  $("#foldTime").onclick = () => {
+    bar.classList.toggle("collapsed");
+    $("#foldTime").textContent = bar.classList.contains("collapsed") ? "⌄" : "⌃";
+    try { localStorage.setItem("bt-time", bar.classList.contains("collapsed") ? "off" : "on"); } catch {}
+  };
+  $("#foldTime").textContent = bar.classList.contains("collapsed") ? "⌄" : "⌃";
+  let timerEnd = 0, timerRang = false;
+  try { timerEnd = parseInt(localStorage.getItem("bt-timer") || "0", 10) || 0; } catch {}
+  function beep(){
+    try {
+      const ctx = new AudioContext();
+      const o = ctx.createOscillator();
+      const g = ctx.createGain();
+      o.frequency.value = 660; o.connect(g); g.connect(ctx.destination); g.gain.value = 0.04;
+      o.start(); setTimeout(() => { o.stop(); ctx.close(); }, 400);
+    } catch {}
+  }
+  function tick(){
+    const now = new Date();
+    $("#clock").textContent = now.toLocaleTimeString("ru-RU", {hour:"2-digit", minute:"2-digit"});
+    const label = $("#timerLeft");
+    if (timerEnd > Date.now()){
+      timerRang = false;
+      const s = Math.ceil((timerEnd - Date.now()) / 1000);
+      const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60;
+      label.textContent = h + ":" + String(m).padStart(2,"0") + ":" + String(sec).padStart(2,"0");
+    } else if (timerEnd){
+      label.textContent = "0:00:00";
+      if (!timerRang){ timerRang = true; timerEnd = 0; try { localStorage.removeItem("bt-timer"); } catch {} toast("Таймер закончился"); beep(); }
+    } else label.textContent = "";
+  }
+  tick();
+  setInterval(tick, 1000);
+  $("#timerStart").onclick = () => {
+    const h = Math.max(0, parseInt($("#timerH").value, 10) || 0);
+    const m = Math.max(0, parseInt($("#timerM").value, 10) || 0);
+    const ms = (h * 3600 + m * 60) * 1000;
+    if (ms < 1000) return toast("Поставь хотя бы одну минуту");
+    timerEnd = Date.now() + ms;
+    timerRang = false;
+    try { localStorage.setItem("bt-timer", String(timerEnd)); } catch {}
+    tick();
+  };
+  $("#timerStop").onclick = () => {
+    timerEnd = 0; timerRang = true;
+    try { localStorage.removeItem("bt-timer"); } catch {}
+    $("#timerLeft").textContent = "";
+  };
+})();
+
+try { if (localStorage.getItem("bt-recall") === "off") $("#recall").classList.add("collapsed"); } catch {}
+$("#foldRecall").onclick = () => {
+  $("#recall").classList.toggle("collapsed");
+  try { localStorage.setItem("bt-recall", $("#recall").classList.contains("collapsed") ? "off" : "on"); } catch {}
+};
+$("#recallShow").onclick = () => {
+  const a = $("#recallA");
+  a.hidden = !a.hidden;
+  $("#recallShow").textContent = a.hidden ? "Показать" : "Скрыть";
+  recallKey = ($("#recallQ").textContent || "") + "\n" + ($("#recallA").textContent || "");
+};
+$("#recallNext").onclick = () => {
+  if (!recallPool.length) return;
+  recallAt = (recallAt + 1) % recallPool.length;
+  recallKey = "";
+  paintRecallItem();
+};
+
+async function addNote(kind, title, content){
+  if (!book) return toast("Сначала открой книгу");
+  const text = (content || "").trim();
+  const name = (title || "").trim();
+  if (!text && !name) return toast("Сначала напиши текст");
+  const ch = currentChapter(currentPage);
+  const r = await api("/api/note", {book, kind, title: name || text.slice(0, 80), content: text,
+    page: currentPage, chapter: noteChapter || (ch && ch.title) || ""});
+  if (r.error){ toast(r.error); return false; }
+  toast("Сохранено");
+  refreshData();
+  return true;
+}
+$("#wordForm").onsubmit = async e => {
+  e.preventDefault();
+  if (await addNote("word", $("#wordTitle").value, $("#wordBody").value)){ $("#wordTitle").value = ""; $("#wordBody").value = ""; }
+};
+$("#clipForm").onsubmit = async e => {
+  e.preventDefault();
+  if (await addNote("excerpt", $("#clipTitle").value, $("#clipBody").value)){ $("#clipTitle").value = ""; $("#clipBody").value = ""; }
+};
+
+let totalBase = 0, bookBase = 0, pending = 0, pendingBook = "";
+let lastTick = 0, flushing = null;
+function fmtSpent(sec){
+  sec = Math.max(0, Math.floor(sec || 0));
+  const h = Math.floor(sec / 3600);
+  const m = Math.floor((sec % 3600) / 60);
+  if (!h) return m + " мин";
+  return h + " ч " + String(m).padStart(2, "0") + " мин";
+}
+function paintTimes(){
+  $("#totalTime").textContent = fmtSpent(totalBase + pending);
+  $("#bookTime").textContent = book && pendingBook === book ? fmtSpent(bookBase + pending) : (book ? fmtSpent(bookBase) : "—");
+}
+async function loadTimes(){
+  const q = book ? ("?book=" + encodeURIComponent(book)) : "";
+  const r = await api("/api/reading-time" + q);
+  if (!r || r.error) return;
+  totalBase = r.total || 0;
+  if ((r.book_name || "") === (book || "")) bookBase = r.book || 0;
+  paintTimes();
+}
+async function flushReading(){
+  if (flushing) return flushing;
+  const whole = Math.floor(pending);
+  const name = pendingBook;
+  if (!name || whole < 1){
+    if (pending < 1) pendingBook = book || "";
+    return;
+  }
+  pending -= whole;
+  flushing = api("/api/reading-time", {book: name, seconds: whole}).then(r => {
+    if (!r || r.error){ pending += whole; return; }
+    totalBase = r.total || 0;
+    if (book === name) bookBase = r.book || 0;
+    if (pending < 0.001){ pending = 0; pendingBook = book || ""; }
+    paintTimes();
+  }).finally(() => { flushing = null; });
+  return flushing;
+}
+function bindSpentFold(boxId, key){
+  const box = $(boxId);
+  const btn = box.querySelector(".fold");
+  try { if (localStorage.getItem(key) === "off") box.classList.add("collapsed"); } catch {}
+  const paint = () => {
+    const off = box.classList.contains("collapsed");
+    btn.textContent = off ? "⌄" : "⌃";
+    btn.title = off ? "Показать время" : "Свернуть";
+  };
+  btn.onclick = () => {
+    box.classList.toggle("collapsed");
+    paint();
+    try { localStorage.setItem(key, box.classList.contains("collapsed") ? "off" : "on"); } catch {}
+  };
+  paint();
+}
+bindSpentFold("#readTotal", "bt-spent-all");
+bindSpentFold("#readBook", "bt-spent-book");
+document.addEventListener("visibilitychange", () => {
+  lastTick = Date.now();
+  if (document.hidden) flushReading();
+});
+window.addEventListener("pagehide", () => {
+  const whole = Math.floor(pending);
+  if (!pendingBook || whole < 1) return;
+  const body = JSON.stringify({book: pendingBook, seconds: whole});
+  pending -= whole;
+  try {
+    navigator.sendBeacon("/api/reading-time", new Blob([body], {type: "application/json"}));
+  } catch {}
+});
+setInterval(() => {
+  const now = Date.now();
+  if (!lastTick) lastTick = now;
+  const visible = document.visibilityState === "visible";
+  const reading = !!(visible && trackPage && book && pdf);
+  if (!reading){ lastTick = now; paintTimes(); return; }
+  const step = Math.min(120, Math.max(0, (now - lastTick) / 1000));
+  lastTick = now;
+  if (pendingBook && pendingBook !== book) flushReading();
+  else {
+    pendingBook = book;
+    pending += step;
+    if (pending >= 20) flushReading();
+  }
+  paintTimes();
+}, 1000);
+loadTimes();
+fillBooks(true);
+</script>
+</body>
+</html>
